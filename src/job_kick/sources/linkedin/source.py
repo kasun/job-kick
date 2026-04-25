@@ -1,11 +1,23 @@
 from job_kick.core.models import Job, SearchQuery, SourceName
 from job_kick.sources.linkedin.client import LinkedInPublicClient
-from job_kick.sources.linkedin.parser import parse_public_search_page
+from job_kick.sources.linkedin.parser import (
+    parse_job_posting,
+    parse_public_search_page,
+)
 
 
 class LinkedInSource:
     name: SourceName = SourceName.LINKEDIN
     display_name: str = "LinkedIn"
+    JOB_VIEW_URL = "https://www.linkedin.com/jobs/view/{job_id}"
+
+    def job_url(self, job_id: str) -> str:
+        return self.JOB_VIEW_URL.format(job_id=job_id)
+
+    async def fetch_job(self, job_id: str) -> Job:
+        async with LinkedInPublicClient() as client:
+            html = await client.fetch_job_posting(job_id)
+        return parse_job_posting(html, job_id, url=self.job_url(job_id))
 
     async def search(self, query: SearchQuery) -> list[Job]:
         results: list[Job] = []

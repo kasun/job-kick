@@ -2,6 +2,9 @@ import asyncio
 
 import httpx
 
+from job_kick.core.errors import JobNotFoundError
+from job_kick.core.models import SourceName
+
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -14,6 +17,9 @@ class LinkedInPublicClient:
     SEARCH_GEO_ID = "92000000"
     SEARCH_URL = (
         "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    )
+    JOB_POSTING_URL = (
+        "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
     )
     WORK_TYPE_REMOTE = "2"
 
@@ -70,6 +76,25 @@ class LinkedInPublicClient:
             print(response.url, response.status_code)
             if response.status_code == 200:
                 return response.text
+            if response.status_code in (429, 500, 502, 503, 504):
+                if attempt == self._max_retries - 1:
+                    response.raise_for_status()
+                await asyncio.sleep(backoff)
+                backoff *= 2
+                continue
+            response.raise_for_status()
+        return ""
+
+    async def fetch_job_posting(self, job_id: str) -> str:
+        url = self.JOB_POSTING_URL.format(job_id=job_id)
+
+        backoff = 1.0
+        for attempt in range(self._max_retries):
+            response = await self._client.get(url)
+            if response.status_code == 200:
+                return response.text
+            if response.status_code in (404, 410):
+                raise JobNotFoundError(SourceName.LINKEDIN, job_id)
             if response.status_code in (429, 500, 502, 503, 504):
                 if attempt == self._max_retries - 1:
                     response.raise_for_status()
