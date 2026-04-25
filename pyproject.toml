@@ -1,0 +1,46 @@
+[project]
+name = "job-kick"
+version = "0.1.0"
+description = "Smart job search agent — search jobs across pluggable sources and converse about the results."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Kasun Herath" }]
+keywords = ["jobs", "job-search", "agent", "cli", "linkedin"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "pydantic>=2.6",
+    "typer>=0.12",
+    "rich>=13.7",
+    "playwright>=1.44",
+    "httpx>=0.27",
+    "parsel>=1.9",
+]
+
+[project.scripts]
+jobq = "job_kick.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/appup-sh/job-kick"
+Issues = "https://github.com/appup-sh/job-kick/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/job_kick"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]
