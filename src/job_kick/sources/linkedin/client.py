@@ -18,9 +18,7 @@ class LinkedInPublicClient:
     SEARCH_URL = (
         "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     )
-    JOB_POSTING_URL = (
-        "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
-    )
+    JOB_POSTING_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
     WORK_TYPE_REMOTE = "2"
 
     def __init__(

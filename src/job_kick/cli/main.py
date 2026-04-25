@@ -5,6 +5,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from job_kick.core.configure.registry import get_steps
+from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
 from job_kick.core.models import Job, SearchQuery, SourceName
 from job_kick.sources.registry import get_source
@@ -43,7 +45,9 @@ def _render_jobs(jobs: list[Job], *, job_source: JobSource) -> None:
         console.print(f"[yellow]No jobs found on {job_source.display_name}.[/yellow]")
         return
 
-    table = Table(title=f"{job_source.display_name} — {len(jobs)} jobs", show_lines=False)
+    table = Table(
+        title=f"{job_source.display_name} — {len(jobs)} jobs", show_lines=False
+    )
     table.add_column("Id", style="bold")
     table.add_column(f"{job_source.display_name} Job ID", style="bold")
     table.add_column("Title", style="bold", overflow="fold")
@@ -112,6 +116,12 @@ def _render_job(job: Job, *, job_source: JobSource) -> None:
             border_style="cyan",
         )
     )
+
+
+@app.command()
+def configure() -> None:
+    """Walk through configuration steps."""
+    WizardRunner(steps=get_steps(), console=console).run()
 
 
 def main() -> None:

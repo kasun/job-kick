@@ -25,6 +25,7 @@ dependencies = [
     "httpx>=0.27",
     "parsel>=1.9",
     "inscriptis>=2.5",
+    "tomli-w>=1.0",
 ]
 
 [project.scripts]
