@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 import typer
+from pydantic import BaseModel, ValidationError
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -9,10 +11,10 @@ from job_kick.core.config import load_config, load_credentials
 from job_kick.core.configure.registry import get_steps
 from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
-from job_kick.core.guards import uses_llm
+from job_kick.core.guards import GuardError, llm_configured, uses_llm
 from job_kick.core.models import Job, SearchQuery, SourceName
 from job_kick.llm import LLMClient
-from job_kick.llm.prompts import summarize_job
+from job_kick.llm.prompts import extract_search_query, summarize_job
 from job_kick.sources.registry import get_source
 from job_kick.sources.base import JobSource
 
@@ -23,25 +25,109 @@ console = Console()
 @app.command()
 def search(
     source: SourceName = typer.Argument(..., help="Job source to search."),
-    keyword: str = typer.Option(..., "--keyword", "-k", help="Search keyword."),
+    keyword: str | None = typer.Option(None, "--keyword", "-k", help="Search keyword."),
     location: str | None = typer.Option(
         None, "--location", "-l", help="Location filter."
     ),
-    limit: int = typer.Option(25, "--limit", help="Max number of jobs to return."),
-    remote_only: bool = typer.Option(
-        False, "--remote-only", help="Only include remote jobs."
+    limit: int | None = typer.Option(
+        None, "--limit", help="Max number of jobs to return."
+    ),
+    remote_only: bool | None = typer.Option(
+        None,
+        "--remote-only/--no-remote-only",
+        help="Only include remote jobs.",
+    ),
+    prompt: str | None = typer.Option(
+        None,
+        "--prompt",
+        "-p",
+        help="Natural-language prompt; fills any arguments not explicitly provided.",
     ),
 ) -> None:
     """Search a job source."""
+    if prompt is not None:
+        extracted = _extract_search_args(prompt)
+        if keyword is None:
+            keyword = extracted.keyword
+        if location is None:
+            location = extracted.location
+        if limit is None:
+            limit = extracted.limit
+        if remote_only is None:
+            remote_only = extracted.remote_only
+
+    if not keyword:
+        console.print(
+            "[red]No search keyword provided.[/red] "
+            "[dim]Pass --keyword/-k or --prompt/-p.[/dim]"
+        )
+        raise typer.Exit(code=1)
+
     job_source = get_source(source)
     query = SearchQuery(
-        keyword=keyword, location=location, limit=limit, remote_only=remote_only
+        keyword=keyword,
+        location=location,
+        limit=limit if limit is not None else 25,
+        remote_only=bool(remote_only),
     )
 
     with console.status(f"Searching {job_source.display_name}…", spinner="dots"):
         jobs = asyncio.run(job_source.search(query))
 
     _render_jobs(jobs, job_source=job_source)
+
+
+class _ExtractedSearchArgs(BaseModel):
+    keyword: str | None = None
+    location: str | None = None
+    limit: int | None = None
+    remote_only: bool | None = None
+
+
+def _extract_search_args(prompt: str) -> _ExtractedSearchArgs:
+    cfg = load_config()
+    creds = load_credentials()
+    try:
+        llm_configured(cfg, creds)
+    except GuardError as exc:
+        console.print(f"[red]{exc.message}[/red]")
+        if exc.hint:
+            console.print(f"[dim]{exc.hint}[/dim]")
+        raise typer.Exit(code=1) from None
+
+    assert cfg.llm is not None
+    console.print(f"[dim]› Using LLM: {cfg.llm.provider}/{cfg.llm.model}[/dim]")
+
+    client = LLMClient.from_config(cfg, creds)
+    with console.status("Parsing prompt…", spinner="dots"):
+        raw = asyncio.run(client.complete(extract_search_query(prompt)))
+
+    return _parse_extracted_args(raw)
+
+
+def _parse_extracted_args(raw: str) -> _ExtractedSearchArgs:
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        console.print("[red]LLM returned a non-JSON response.[/red]")
+        raise typer.Exit(code=1) from None
+
+    if not isinstance(data, dict):
+        console.print("[red]LLM response was not a JSON object.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        return _ExtractedSearchArgs.model_validate(data)
+    except ValidationError as exc:
+        console.print(f"[red]LLM response failed validation:[/red]\n{exc}")
+        raise typer.Exit(code=1) from None
 
 
 def _render_jobs(jobs: list[Job], *, job_source: JobSource) -> None:

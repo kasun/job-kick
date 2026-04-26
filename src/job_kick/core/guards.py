@@ -39,9 +39,7 @@ def llm_configured(cfg: JobqConfig, creds: Credentials) -> None:
         )
 
 
-def _run_guards(
-    cfg: JobqConfig, creds: Credentials, guards: tuple[Guard, ...]
-) -> None:
+def _run_guards(cfg: JobqConfig, creds: Credentials, guards: tuple[Guard, ...]) -> None:
     for guard in guards:
         try:
             guard(cfg, creds)
@@ -74,9 +72,7 @@ def uses_llm(fn: Callable) -> Callable:
         creds = load_credentials()
         _run_guards(cfg, creds, (llm_configured,))
         assert cfg.llm is not None
-        Console().print(
-            f"[dim]› Using LLM: {cfg.llm.provider}/{cfg.llm.model}[/dim]"
-        )
+        Console().print(f"[dim]› Using LLM: {cfg.llm.provider}/{cfg.llm.model}[/dim]")
         return fn(*args, **kwargs)
 
     return wrapper

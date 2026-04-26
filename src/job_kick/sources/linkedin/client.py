@@ -71,7 +71,6 @@ class LinkedInPublicClient:
         backoff = 1.0
         for attempt in range(self._max_retries):
             response = await self._client.get(self.SEARCH_URL, params=params)
-            print(response.url, response.status_code)
             if response.status_code == 200:
                 return response.text
             if response.status_code in (429, 500, 502, 503, 504):
