@@ -5,10 +5,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from job_kick.core.config import load_config, load_credentials
 from job_kick.core.configure.registry import get_steps
 from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
+from job_kick.core.guards import llm_configured, requires
 from job_kick.core.models import Job, SearchQuery, SourceName
+from job_kick.llm import LLMClient
+from job_kick.llm.prompts import summarize_job
 from job_kick.sources.registry import get_source
 from job_kick.sources.base import JobSource
 
@@ -116,6 +120,35 @@ def _render_job(job: Job, *, job_source: JobSource) -> None:
             border_style="cyan",
         )
     )
+
+
+@app.command()
+@requires(llm_configured)
+def summarize(
+    source: SourceName = typer.Argument(..., help="Job source the id belongs to."),
+    job_id: str = typer.Argument(..., help="Source-specific job id."),
+) -> None:
+    """Summarize a job description using the configured LLM."""
+    client = LLMClient.from_config(load_config(), load_credentials())
+    job_source = get_source(source)
+
+    try:
+        with console.status(
+            f"Fetching job {job_id} from {job_source.display_name}…", spinner="dots"
+        ):
+            job = asyncio.run(job_source.fetch_job(job_id))
+    except JobNotFoundError as exc:
+        console.print(f"[yellow]{exc}[/yellow]")
+        raise typer.Exit(code=1) from None
+
+    console.print(f"\n[bold cyan]Summary — {job.title}[/bold cyan]\n")
+    asyncio.run(_stream_summary(client, job))
+    console.print()
+
+
+async def _stream_summary(client: LLMClient, job: Job) -> None:
+    async for chunk in client.stream(summarize_job(job)):
+        print(chunk, end="", flush=True)
 
 
 @app.command()

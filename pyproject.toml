@@ -26,6 +26,7 @@ dependencies = [
     "parsel>=1.9",
     "inscriptis>=2.5",
     "tomli-w>=1.0",
+    "litellm>=1.83.13",
 ]
 
 [project.scripts]
