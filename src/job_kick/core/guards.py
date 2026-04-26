@@ -39,23 +39,44 @@ def llm_configured(cfg: JobqConfig, creds: Credentials) -> None:
         )
 
 
+def _run_guards(
+    cfg: JobqConfig, creds: Credentials, guards: tuple[Guard, ...]
+) -> None:
+    for guard in guards:
+        try:
+            guard(cfg, creds)
+        except GuardError as exc:
+            console = Console()
+            console.print(f"[red]{exc.message}[/red]")
+            if exc.hint:
+                console.print(f"[dim]{exc.hint}[/dim]")
+            raise typer.Exit(code=1) from None
+
+
 def requires(*guards: Guard) -> Callable:
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             cfg = load_config()
             creds = load_credentials()
-            for guard in guards:
-                try:
-                    guard(cfg, creds)
-                except GuardError as exc:
-                    console = Console()
-                    console.print(f"[red]{exc.message}[/red]")
-                    if exc.hint:
-                        console.print(f"[dim]{exc.hint}[/dim]")
-                    raise typer.Exit(code=1) from None
+            _run_guards(cfg, creds, guards)
             return fn(*args, **kwargs)
 
         return wrapper
 
     return decorator
+
+
+def uses_llm(fn: Callable) -> Callable:
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        cfg = load_config()
+        creds = load_credentials()
+        _run_guards(cfg, creds, (llm_configured,))
+        assert cfg.llm is not None
+        Console().print(
+            f"[dim]› Using LLM: {cfg.llm.provider}/{cfg.llm.model}[/dim]"
+        )
+        return fn(*args, **kwargs)
+
+    return wrapper

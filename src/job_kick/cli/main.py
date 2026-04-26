@@ -9,7 +9,7 @@ from job_kick.core.config import load_config, load_credentials
 from job_kick.core.configure.registry import get_steps
 from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
-from job_kick.core.guards import llm_configured, requires
+from job_kick.core.guards import uses_llm
 from job_kick.core.models import Job, SearchQuery, SourceName
 from job_kick.llm import LLMClient
 from job_kick.llm.prompts import summarize_job
@@ -123,7 +123,7 @@ def _render_job(job: Job, *, job_source: JobSource) -> None:
 
 
 @app.command()
-@requires(llm_configured)
+@uses_llm
 def summarize(
     source: SourceName = typer.Argument(..., help="Job source the id belongs to."),
     job_id: str = typer.Argument(..., help="Source-specific job id."),
