@@ -312,6 +312,59 @@ def configure() -> None:
     WizardRunner(steps=get_steps(), console=console).run()
 
 
+@bookmarks_app.command("add")
+def bookmarks_add(
+    job_ids: list[str] = typer.Argument(
+        ..., help="One or more source-specific job ids to bookmark."
+    ),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source the ids belong to. Falls back to the configured default.",
+    ),
+) -> None:
+    """Bookmark one or more jobs by job id."""
+    job_source = get_source(_resolve_source(source))
+
+    with console.status(
+        f"Fetching {len(job_ids)} job(s) from {job_source.display_name}…",
+        spinner="dots",
+    ):
+        results = asyncio.run(_fetch_many(job_source, job_ids))
+
+    saved = 0
+    missing: list[str] = []
+    failed: list[tuple[str, str]] = []
+    with Storage() as store:
+        for job_id, outcome in zip(job_ids, results):
+            if isinstance(outcome, JobNotFoundError):
+                missing.append(job_id)
+            elif isinstance(outcome, Exception):
+                failed.append((job_id, str(outcome)))
+            else:
+                store.jobs.upsert(outcome)
+                saved += 1
+
+    if saved:
+        console.print(f"[dim]› Bookmarked {saved} job(s).[/dim]")
+    if missing:
+        console.print(f"[yellow]Not found: {', '.join(missing)}[/yellow]")
+    for jid, err in failed:
+        console.print(f"[red]Failed {jid}:[/red] {err}")
+    if not saved:
+        raise typer.Exit(code=1)
+
+
+async def _fetch_many(
+    job_source: JobSource, job_ids: list[str]
+) -> list[Job | BaseException]:
+    return await asyncio.gather(
+        *(job_source.fetch_job(jid) for jid in job_ids),
+        return_exceptions=True,
+    )
+
+
 @bookmarks_app.command("remove")
 def bookmarks_remove(
     source: SourceName = typer.Argument(..., help="Job source the ids belong to."),
