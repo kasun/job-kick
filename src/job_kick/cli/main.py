@@ -12,7 +12,7 @@ from job_kick.core.configure.registry import get_steps
 from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
 from job_kick.core.guards import GuardError, llm_configured, uses_llm
-from job_kick.core.models import Job, SearchQuery, SourceName
+from job_kick.core.models import Job, JobType, SearchQuery, SourceName
 from job_kick.core.storage import Storage
 from job_kick.llm import LLMClient
 from job_kick.llm.prompts import extract_search_query, summarize_job
@@ -45,6 +45,12 @@ def search(
         "--remote-only/--no-remote-only",
         help="Only include remote jobs.",
     ),
+    job_types: list[JobType] = typer.Option(
+        [],
+        "--job-type",
+        "-j",
+        help="Filter by job type. Repeatable: -j part_time -j contract.",
+    ),
     prompt: str | None = typer.Option(
         None,
         "--prompt",
@@ -66,6 +72,8 @@ def search(
             limit = extracted.limit
         if remote_only is None:
             remote_only = extracted.remote_only
+        if not job_types and extracted.job_types:
+            job_types = extracted.job_types
 
     if not keyword:
         console.print(
@@ -80,6 +88,7 @@ def search(
         location=location,
         limit=limit if limit is not None else 25,
         remote_only=bool(remote_only),
+        job_types=job_types,
     )
 
     with console.status(f"Searching {job_source.display_name}…", spinner="dots"):
@@ -111,6 +120,7 @@ class _ExtractedSearchArgs(BaseModel):
     location: str | None = None
     limit: int | None = None
     remote_only: bool | None = None
+    job_types: list[JobType] = []
 
 
 def _extract_search_args(prompt: str) -> _ExtractedSearchArgs:

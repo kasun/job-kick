@@ -9,11 +9,22 @@ class SourceName(StrEnum):
     LINKEDIN = "linkedin"
 
 
+class JobType(StrEnum):
+    FULL_TIME = "full_time"
+    PART_TIME = "part_time"
+    CONTRACT = "contract"
+    TEMPORARY = "temporary"
+    INTERNSHIP = "internship"
+    VOLUNTEER = "volunteer"
+    OTHER = "other"
+
+
 class SearchQuery(BaseModel):
     keyword: str
     location: str | None = None
     limit: int = 25
     remote_only: bool = False
+    job_types: list[JobType] = Field(default_factory=list)
 
 
 class Company(BaseModel):

@@ -3,13 +3,23 @@ import asyncio
 import httpx
 
 from job_kick.core.errors import JobNotFoundError
-from job_kick.core.models import SourceName
+from job_kick.core.models import JobType, SourceName
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36"
 )
+
+JOB_TYPE_CODES: dict[JobType, str] = {
+    JobType.FULL_TIME: "F",
+    JobType.PART_TIME: "P",
+    JobType.CONTRACT: "C",
+    JobType.TEMPORARY: "T",
+    JobType.INTERNSHIP: "I",
+    JobType.VOLUNTEER: "V",
+    JobType.OTHER: "O",
+}
 
 
 class LinkedInPublicClient:
@@ -55,6 +65,7 @@ class LinkedInPublicClient:
         location: str | None,
         start: int,
         remote_only: bool = False,
+        job_types: list[JobType] | None = None,
     ) -> str:
         params: dict[str, str | int] = {
             "keywords": keywords,
@@ -67,6 +78,8 @@ class LinkedInPublicClient:
             params["location"] = self.WORLDWIDE_LOCATION
         if remote_only:
             params["f_WT"] = self.WORK_TYPE_REMOTE
+        if job_types:
+            params["f_JT"] = ",".join(JOB_TYPE_CODES[t] for t in job_types)
 
         backoff = 1.0
         for attempt in range(self._max_retries):

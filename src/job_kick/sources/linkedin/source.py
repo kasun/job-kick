@@ -31,6 +31,7 @@ class LinkedInSource:
                     location=query.location,
                     start=start,
                     remote_only=query.remote_only,
+                    job_types=query.job_types,
                 )
                 page = parse_public_search_page(html)
                 if not page:

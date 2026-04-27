@@ -12,6 +12,9 @@ def extract_search_query(prompt: str) -> list[Message]:
         "- location (string): city, region, or country to filter by\n"
         "- limit (integer): max number of jobs to return\n"
         "- remote_only (boolean): true if the user only wants remote jobs\n"
+        "- job_types (array of strings, subset of: full_time, part_time, "
+        "contract, temporary, internship, volunteer, other): employment "
+        "types the user wants\n"
         "Omit any field the user did not specify. Do not invent values. "
         "Return JSON only — no prose, no code fences."
     )
