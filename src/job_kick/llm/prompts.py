@@ -1,13 +1,15 @@
-from job_kick.core.models import Job
+from job_kick.core.models import Job, SourceName
 
 Message = dict[str, str]
 
 
 def extract_search_query(prompt: str) -> list[Message]:
+    sources = ", ".join(s.value for s in SourceName)
     system = (
         "You extract structured job-search parameters from a natural-language "
         "request. Respond with a single JSON object containing only these "
         "optional keys:\n"
+        f"- source (string, one of: {sources}): job source to search\n"
         "- keyword (string): job title, role, or technology to search for\n"
         "- location (string): city, region, or country to filter by\n"
         "- limit (integer): max number of jobs to return\n"

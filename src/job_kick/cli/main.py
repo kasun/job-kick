@@ -64,6 +64,8 @@ def search(
     """Search a job source."""
     if prompt is not None:
         extracted = _extract_search_args(prompt)
+        if source is None and extracted.source is not None:
+            source = _coerce_extracted_source(extracted.source)
         if keyword is None:
             keyword = extracted.keyword
         if location is None:
@@ -102,6 +104,18 @@ def search(
     _render_jobs(jobs, job_source=job_source)
 
 
+def _coerce_extracted_source(value: str) -> SourceName:
+    try:
+        return SourceName(value)
+    except ValueError:
+        available = ", ".join(s.value for s in SourceName)
+        console.print(
+            f"[red]LLM extracted source '{value}' which isn't supported.[/red] "
+            f"[dim]Available: {available}. Pass --source/-s explicitly or rephrase.[/dim]"
+        )
+        raise typer.Exit(code=1) from None
+
+
 def _resolve_source(passed: SourceName | None) -> SourceName:
     if passed is not None:
         return passed
@@ -116,6 +130,7 @@ def _resolve_source(passed: SourceName | None) -> SourceName:
 
 
 class _ExtractedSearchArgs(BaseModel):
+    source: str | None = None
     keyword: str | None = None
     location: str | None = None
     limit: int | None = None
