@@ -13,6 +13,7 @@ from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
 from job_kick.core.guards import GuardError, llm_configured, uses_llm
 from job_kick.core.models import Job, SearchQuery, SourceName
+from job_kick.core.storage import Storage
 from job_kick.llm import LLMClient
 from job_kick.llm.prompts import extract_search_query, summarize_job
 from job_kick.sources.registry import get_source
@@ -42,6 +43,9 @@ def search(
         "--prompt",
         "-p",
         help="Natural-language prompt; fills any arguments not explicitly provided.",
+    ),
+    bookmark: bool = typer.Option(
+        False, "--bookmark", help="Persist results to the local job store."
     ),
 ) -> None:
     """Search a job source."""
@@ -73,6 +77,11 @@ def search(
 
     with console.status(f"Searching {job_source.display_name}…", spinner="dots"):
         jobs = asyncio.run(job_source.search(query))
+
+    if bookmark and jobs:
+        with Storage() as store:
+            saved = store.jobs.upsert_many(jobs)
+        console.print(f"[dim]› Bookmarked {saved} job(s).[/dim]")
 
     _render_jobs(jobs, job_source=job_source)
 

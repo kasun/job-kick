@@ -27,6 +27,7 @@ dependencies = [
     "inscriptis>=2.5",
     "tomli-w>=1.0",
     "litellm>=1.83.13",
+    "tinydb>=4.8.2",
 ]
 
 [project.scripts]
