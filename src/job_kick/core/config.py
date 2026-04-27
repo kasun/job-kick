@@ -6,6 +6,8 @@ from pathlib import Path
 import tomli_w
 from pydantic import BaseModel
 
+from job_kick.core.models import SourceName
+
 
 class LLMConfig(BaseModel):
     provider: str
@@ -14,6 +16,7 @@ class LLMConfig(BaseModel):
 
 class JobqConfig(BaseModel):
     llm: LLMConfig | None = None
+    default_source: SourceName | None = None
 
 
 class ProviderCredentials(BaseModel):

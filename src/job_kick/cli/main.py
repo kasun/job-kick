@@ -27,7 +27,12 @@ console = Console()
 
 @app.command()
 def search(
-    source: SourceName = typer.Argument(..., help="Job source to search."),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source to search. Falls back to the configured default.",
+    ),
     keyword: str | None = typer.Option(None, "--keyword", "-k", help="Search keyword."),
     location: str | None = typer.Option(
         None, "--location", "-l", help="Location filter."
@@ -69,7 +74,7 @@ def search(
         )
         raise typer.Exit(code=1)
 
-    job_source = get_source(source)
+    job_source = get_source(_resolve_source(source))
     query = SearchQuery(
         keyword=keyword,
         location=location,
@@ -86,6 +91,19 @@ def search(
         console.print(f"[dim]› Bookmarked {saved} job(s).[/dim]")
 
     _render_jobs(jobs, job_source=job_source)
+
+
+def _resolve_source(passed: SourceName | None) -> SourceName:
+    if passed is not None:
+        return passed
+    cfg = load_config()
+    if cfg.default_source is not None:
+        return cfg.default_source
+    console.print(
+        "[red]No source specified.[/red] "
+        "[dim]Pass --source/-s or run `jobq configure` to set a default.[/dim]"
+    )
+    raise typer.Exit(code=1)
 
 
 class _ExtractedSearchArgs(BaseModel):
@@ -171,21 +189,31 @@ def _render_jobs(jobs: list[Job], *, job_source: JobSource) -> None:
 
 @app.command()
 def url(
-    source: SourceName = typer.Argument(..., help="Job source the id belongs to."),
     job_id: str = typer.Argument(..., help="Source-specific job id."),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source the id belongs to. Falls back to the configured default.",
+    ),
 ) -> None:
     """Print the public URL for a job."""
-    job_source = get_source(source)
+    job_source = get_source(_resolve_source(source))
     typer.echo(job_source.job_url(job_id))
 
 
 @app.command()
 def describe(
-    source: SourceName = typer.Argument(..., help="Job source the id belongs to."),
     job_id: str = typer.Argument(..., help="Source-specific job id."),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source the id belongs to. Falls back to the configured default.",
+    ),
 ) -> None:
     """Show the full description for a job."""
-    job_source = get_source(source)
+    job_source = get_source(_resolve_source(source))
 
     try:
         with console.status(
@@ -222,12 +250,17 @@ def _render_job(job: Job, *, job_source: JobSource) -> None:
 @app.command()
 @uses_llm
 def summarize(
-    source: SourceName = typer.Argument(..., help="Job source the id belongs to."),
     job_id: str = typer.Argument(..., help="Source-specific job id."),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source the id belongs to. Falls back to the configured default.",
+    ),
 ) -> None:
     """Summarize a job description using the configured LLM."""
     client = LLMClient.from_config(load_config(), load_credentials())
-    job_source = get_source(source)
+    job_source = get_source(_resolve_source(source))
 
     try:
         with console.status(
