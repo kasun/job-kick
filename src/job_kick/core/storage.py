@@ -46,6 +46,20 @@ class JobsTable:
             Job.model_validate(d) for d in self._table.search(q.source == source.value)
         ]
 
+    def delete(self, source: SourceName, job_id: str) -> bool:
+        q = Query()
+        removed = self._table.remove((q.source == source.value) & (q.id == job_id))
+        return bool(removed)
+
+    def clear(self, source: SourceName | None = None) -> int:
+        if source is None:
+            count = len(self._table)
+            self._table.truncate()
+            return count
+        q = Query()
+        removed = self._table.remove(q.source == source.value)
+        return len(removed)
+
 
 class Storage:
     def __init__(self, path: Path | None = None) -> None:

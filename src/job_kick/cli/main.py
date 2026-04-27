@@ -20,6 +20,8 @@ from job_kick.sources.registry import get_source
 from job_kick.sources.base import JobSource
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+bookmarks_app = typer.Typer(no_args_is_help=True, help="Manage bookmarked jobs.")
+app.add_typer(bookmarks_app, name="bookmarks")
 console = Console()
 
 
@@ -250,6 +252,84 @@ async def _stream_summary(client: LLMClient, job: Job) -> None:
 def configure() -> None:
     """Walk through configuration steps."""
     WizardRunner(steps=get_steps(), console=console).run()
+
+
+@bookmarks_app.command("remove")
+def bookmarks_remove(
+    source: SourceName = typer.Argument(..., help="Job source the ids belong to."),
+    job_ids: list[str] = typer.Argument(
+        ..., help="One or more source-specific job ids to remove."
+    ),
+) -> None:
+    """Remove one or more bookmarks by job id."""
+    removed = 0
+    missing: list[str] = []
+    with Storage() as store:
+        for job_id in job_ids:
+            if store.jobs.delete(source, job_id):
+                removed += 1
+            else:
+                missing.append(job_id)
+
+    if removed:
+        console.print(f"[dim]› Removed {removed} bookmark(s).[/dim]")
+    if missing:
+        console.print(f"[yellow]Not bookmarked: {', '.join(missing)}[/yellow]")
+    if not removed:
+        raise typer.Exit(code=1)
+
+
+@bookmarks_app.command("clear")
+def bookmarks_clear(
+    source: SourceName | None = typer.Option(
+        None, "--source", "-s", help="Only clear bookmarks from this source."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the confirmation prompt."
+    ),
+) -> None:
+    """Remove all bookmarks (optionally scoped to a single source)."""
+    scope = f"all bookmarks from {source.value}" if source else "all bookmarks"
+    if not yes and not typer.confirm(f"Remove {scope}?", default=False):
+        raise typer.Exit(code=1)
+
+    with Storage() as store:
+        removed = store.jobs.clear(source)
+
+    console.print(f"[dim]› Removed {removed} bookmark(s).[/dim]")
+
+
+@bookmarks_app.command("list")
+def bookmarks_list() -> None:
+    """List bookmarked jobs."""
+    with Storage() as store:
+        jobs = store.jobs.all()
+
+    if not jobs:
+        console.print("[yellow]No bookmarks yet.[/yellow]")
+        return
+
+    table = Table(title=f"Bookmarks — {len(jobs)} jobs", show_lines=False)
+    table.add_column("Id", style="bold")
+    table.add_column("Source", style="bold")
+    table.add_column("Job ID", style="bold")
+    table.add_column("Title", style="bold", overflow="fold")
+    table.add_column("Company")
+    table.add_column("Location")
+    table.add_column("Posted")
+
+    for idx, job in enumerate(jobs, start=1):
+        table.add_row(
+            str(idx),
+            job.source.value,
+            job.id,
+            f"[link={job.url}]{job.title}[/link]",
+            job.company.name,
+            job.location or "—",
+            job.posted_at.strftime("%Y-%m-%d") if job.posted_at else "—",
+        )
+
+    console.print(table)
 
 
 def main() -> None:
