@@ -1,3 +1,5 @@
+import logging
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -6,6 +8,7 @@ import litellm
 from job_kick.core.config import Credentials, JobqConfig, LLMConfig, get_api_key
 
 litellm.telemetry = False
+logger = logging.getLogger(__name__)
 
 Message = dict[str, Any]
 
@@ -26,17 +29,27 @@ class LLMClient:
         return cls(cfg.llm, api_key)
 
     async def complete(self, messages: list[Message], **kwargs: Any) -> str:
+        logger.debug("complete model=%s messages=%d", self._model, len(messages))
+        started = time.monotonic()
         resp = await litellm.acompletion(
             model=self._model,
             messages=messages,
             api_key=self._api_key,
             **kwargs,
         )
-        return resp.choices[0].message.content or ""
+        content = resp.choices[0].message.content or ""
+        logger.debug(
+            "complete done model=%s elapsed=%.2fs response_chars=%d",
+            self._model,
+            time.monotonic() - started,
+            len(content),
+        )
+        return content
 
     async def stream(
         self, messages: list[Message], **kwargs: Any
     ) -> AsyncIterator[str]:
+        logger.debug("stream model=%s messages=%d", self._model, len(messages))
         resp = await litellm.acompletion(
             model=self._model,
             messages=messages,

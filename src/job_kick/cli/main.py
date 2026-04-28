@@ -1,5 +1,7 @@
 import asyncio
 import json
+import logging
+import sys
 
 import typer
 from pydantic import BaseModel, ValidationError
@@ -23,6 +25,27 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 bookmarks_app = typer.Typer(no_args_is_help=True, help="Manage bookmarked jobs.")
 app.add_typer(bookmarks_app, name="bookmarks")
 console = Console()
+
+
+def _configure_logging(*, verbose: bool) -> None:
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    pkg_logger = logging.getLogger("job_kick")
+    pkg_logger.handlers.clear()
+    pkg_logger.addHandler(handler)
+    pkg_logger.setLevel(logging.DEBUG if verbose else logging.WARNING)
+    pkg_logger.propagate = False
+
+
+@app.callback()
+def _main_callback(
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable debug logging to stderr."
+    ),
+) -> None:
+    _configure_logging(verbose=verbose)
 
 
 @app.command()

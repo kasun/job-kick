@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 import httpx
 
 from job_kick.core.errors import JobNotFoundError
 from job_kick.core.models import JobType, SourceName
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -81,14 +84,23 @@ class LinkedInPublicClient:
         if job_types:
             params["f_JT"] = ",".join(JOB_TYPE_CODES[t] for t in job_types)
 
+        logger.debug("search request params=%s", params)
+
         backoff = 1.0
         for attempt in range(self._max_retries):
             response = await self._client.get(self.SEARCH_URL, params=params)
+            logger.debug(
+                "search response attempt=%d status=%d bytes=%d",
+                attempt + 1,
+                response.status_code,
+                len(response.content),
+            )
             if response.status_code == 200:
                 return response.text
             if response.status_code in (429, 500, 502, 503, 504):
                 if attempt == self._max_retries - 1:
                     response.raise_for_status()
+                logger.debug("retrying after %.1fs", backoff)
                 await asyncio.sleep(backoff)
                 backoff *= 2
                 continue
@@ -97,10 +109,17 @@ class LinkedInPublicClient:
 
     async def fetch_job_posting(self, job_id: str) -> str:
         url = self.JOB_POSTING_URL.format(job_id=job_id)
+        logger.debug("job posting fetch id=%s", job_id)
 
         backoff = 1.0
         for attempt in range(self._max_retries):
             response = await self._client.get(url)
+            logger.debug(
+                "job posting response id=%s attempt=%d status=%d",
+                job_id,
+                attempt + 1,
+                response.status_code,
+            )
             if response.status_code == 200:
                 return response.text
             if response.status_code in (404, 410):
@@ -108,6 +127,7 @@ class LinkedInPublicClient:
             if response.status_code in (429, 500, 502, 503, 504):
                 if attempt == self._max_retries - 1:
                     response.raise_for_status()
+                logger.debug("retrying after %.1fs", backoff)
                 await asyncio.sleep(backoff)
                 backoff *= 2
                 continue
