@@ -32,6 +32,7 @@ class LinkedInSource:
                     start=start,
                     remote_only=query.remote_only,
                     job_types=query.job_types,
+                    posted_within=query.posted_within,
                 )
                 page = parse_public_search_page(html)
                 if not page:

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -25,6 +25,7 @@ class SearchQuery(BaseModel):
     limit: int = 25
     remote_only: bool = False
     job_types: list[JobType] = Field(default_factory=list)
+    posted_within: timedelta | None = None
 
 
 class Company(BaseModel):

@@ -17,6 +17,8 @@ def extract_search_query(prompt: str) -> list[Message]:
         "- job_types (array of strings, subset of: full_time, part_time, "
         "contract, temporary, internship, volunteer, other): employment "
         "types the user wants\n"
+        "- posted_within (string, format: number + h/d/w, e.g. '24h', '3d', "
+        "'2w'): only jobs posted within this duration\n"
         "Omit any field the user did not specify. Do not invent values. "
         "Return JSON only — no prose, no code fences."
     )

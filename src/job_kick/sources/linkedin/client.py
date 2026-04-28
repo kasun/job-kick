@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import timedelta
 
 import httpx
 
@@ -69,6 +70,7 @@ class LinkedInPublicClient:
         start: int,
         remote_only: bool = False,
         job_types: list[JobType] | None = None,
+        posted_within: timedelta | None = None,
     ) -> str:
         params: dict[str, str | int] = {
             "keywords": keywords,
@@ -83,6 +85,8 @@ class LinkedInPublicClient:
             params["f_WT"] = self.WORK_TYPE_REMOTE
         if job_types:
             params["f_JT"] = ",".join(JOB_TYPE_CODES[t] for t in job_types)
+        if posted_within is not None:
+            params["f_TPR"] = f"r{int(posted_within.total_seconds())}"
 
         logger.debug("search request params=%s", params)
 

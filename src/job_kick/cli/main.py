@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import re
 import sys
+from datetime import timedelta
 
 import typer
 from pydantic import BaseModel, ValidationError
@@ -74,6 +76,11 @@ def search(
         "-j",
         help="Filter by job type. Repeatable: -j part_time -j contract.",
     ),
+    since: str | None = typer.Option(
+        None,
+        "--since",
+        help="Only jobs posted within this duration. e.g. 24h, 3d, 2w.",
+    ),
     prompt: str | None = typer.Option(
         None,
         "--prompt",
@@ -99,6 +106,8 @@ def search(
             remote_only = extracted.remote_only
         if not job_types and extracted.job_types:
             job_types = extracted.job_types
+        if since is None and extracted.posted_within is not None:
+            since = extracted.posted_within
 
     if not keyword:
         console.print(
@@ -107,6 +116,8 @@ def search(
         )
         raise typer.Exit(code=1)
 
+    posted_within = _parse_duration(since) if since else None
+
     job_source = get_source(_resolve_source(source))
     query = SearchQuery(
         keyword=keyword,
@@ -114,6 +125,7 @@ def search(
         limit=limit if limit is not None else 25,
         remote_only=bool(remote_only),
         job_types=job_types,
+        posted_within=posted_within,
     )
 
     with console.status(f"Searching {job_source.display_name}…", spinner="dots"):
@@ -125,6 +137,25 @@ def search(
         console.print(f"[dim]› Bookmarked {saved} job(s).[/dim]")
 
     _render_jobs(jobs, job_source=job_source)
+
+
+_DURATION_RE = re.compile(r"^(\d+)([hdw])$")
+
+
+def _parse_duration(s: str) -> timedelta:
+    m = _DURATION_RE.match(s.strip().lower())
+    if not m:
+        console.print(
+            f"[red]Invalid duration {s!r}.[/red] "
+            "[dim]Expected number + h/d/w, e.g. 24h, 3d, 2w.[/dim]"
+        )
+        raise typer.Exit(code=1)
+    n, unit = int(m.group(1)), m.group(2)
+    if unit == "h":
+        return timedelta(hours=n)
+    if unit == "d":
+        return timedelta(days=n)
+    return timedelta(weeks=n)
 
 
 def _coerce_extracted_source(value: str) -> SourceName:
@@ -159,6 +190,7 @@ class _ExtractedSearchArgs(BaseModel):
     limit: int | None = None
     remote_only: bool | None = None
     job_types: list[JobType] = []
+    posted_within: str | None = None
 
 
 def _extract_search_args(prompt: str) -> _ExtractedSearchArgs:
