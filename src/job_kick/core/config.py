@@ -17,6 +17,7 @@ class LLMConfig(BaseModel):
 class JobqConfig(BaseModel):
     llm: LLMConfig | None = None
     default_source: SourceName | None = None
+    profile_path: Path | None = None
 
 
 class ProviderCredentials(BaseModel):
@@ -46,6 +47,12 @@ def credentials_path() -> Path:
     return config_dir() / "credentials.toml"
 
 
+def profile_file_path(cfg: "JobqConfig | None" = None) -> Path:
+    if cfg is None:
+        cfg = load_config()
+    return cfg.profile_path or (config_dir() / "profile.md")
+
+
 def load_config() -> JobqConfig:
     path = config_path()
     if not path.exists():
@@ -55,7 +62,7 @@ def load_config() -> JobqConfig:
 
 
 def save_config(cfg: JobqConfig) -> None:
-    _atomic_write_toml(config_path(), cfg.model_dump(exclude_none=True))
+    _atomic_write_toml(config_path(), cfg.model_dump(mode="json", exclude_none=True))
 
 
 def load_credentials() -> Credentials:

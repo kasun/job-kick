@@ -5,13 +5,16 @@ import re
 import sys
 from datetime import timedelta
 
+import click
 import typer
 from pydantic import BaseModel, ValidationError
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from job_kick.core.config import load_config, load_credentials
+from job_kick.core.config import load_config, load_credentials, profile_file_path
+from job_kick.core.profile import ensure_profile, load_profile
 from job_kick.core.configure.registry import get_steps
 from job_kick.core.configure.wizard import WizardRunner
 from job_kick.core.errors import JobNotFoundError
@@ -19,13 +22,15 @@ from job_kick.core.guards import GuardError, llm_configured, uses_llm
 from job_kick.core.models import Job, JobType, SearchQuery, SourceName
 from job_kick.core.storage import Storage
 from job_kick.llm import LLMClient
-from job_kick.llm.prompts import extract_search_query, summarize_job
+from job_kick.llm.prompts import extract_search_query, match_job, summarize_job
 from job_kick.sources.registry import get_source
 from job_kick.sources.base import JobSource
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 bookmarks_app = typer.Typer(no_args_is_help=True, help="Manage bookmarked jobs.")
 app.add_typer(bookmarks_app, name="bookmarks")
+profile_app = typer.Typer(no_args_is_help=True, help="Manage your search profile.")
+app.add_typer(profile_app, name="profile")
 console = Console()
 
 
@@ -362,9 +367,86 @@ async def _stream_summary(client: LLMClient, job: Job) -> None:
 
 
 @app.command()
+@uses_llm
+def match(
+    job_id: str = typer.Argument(..., help="Source-specific job id."),
+    source: SourceName | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Job source the id belongs to. Falls back to the configured default.",
+    ),
+) -> None:
+    """Match a job against your search profile."""
+    cfg = load_config()
+    creds = load_credentials()
+
+    path = profile_file_path(cfg)
+    profile = load_profile(path)
+    if profile is None or not profile.strip():
+        console.print(
+            f"[red]No profile found at {path}.[/red] "
+            "[dim]Run `jobq profile edit` to create one.[/dim]"
+        )
+        raise typer.Exit(code=1)
+
+    client = LLMClient.from_config(cfg, creds)
+    job_source = get_source(_resolve_source(source))
+
+    try:
+        with console.status(
+            f"Fetching job {job_id} from {job_source.display_name}…", spinner="dots"
+        ):
+            job = asyncio.run(job_source.fetch_job(job_id))
+    except JobNotFoundError as exc:
+        console.print(f"[yellow]{exc}[/yellow]")
+        raise typer.Exit(code=1) from None
+
+    console.print(
+        f"\n[bold cyan]Match — {job.title} @ {job.company.name}[/bold cyan]\n"
+    )
+    asyncio.run(_stream_match(client, profile, job))
+    console.print()
+
+
+async def _stream_match(client: LLMClient, profile: str, job: Job) -> None:
+    async for chunk in client.stream(match_job(profile, job)):
+        print(chunk, end="", flush=True)
+
+
+@app.command()
 def configure() -> None:
     """Walk through configuration steps."""
     WizardRunner(steps=get_steps(), console=console).run()
+
+
+@profile_app.command("path")
+def profile_path() -> None:
+    """Print the absolute path to the profile file."""
+    typer.echo(str(profile_file_path()))
+
+
+@profile_app.command("show")
+def profile_show() -> None:
+    """Render the profile."""
+    path = profile_file_path()
+    content = load_profile(path)
+    if content is None:
+        console.print(
+            f"[yellow]No profile yet at {path}.[/yellow] "
+            "[dim]Run `jobq profile edit` to create one.[/dim]"
+        )
+        raise typer.Exit(code=1)
+    console.print(Markdown(content))
+
+
+@profile_app.command("edit")
+def profile_edit() -> None:
+    """Open the profile in $EDITOR (creates from template if missing)."""
+    path = profile_file_path()
+    if ensure_profile(path):
+        console.print(f"[dim]› Created profile at {path}[/dim]")
+    click.edit(filename=str(path))
 
 
 @bookmarks_app.command("add")
