@@ -28,6 +28,36 @@ def extract_search_query(prompt: str) -> list[Message]:
     ]
 
 
+def score_job(profile: str, job: Job) -> list[Message]:
+    system = (
+        'You score how well a job posting fits the user\'s "looking for" '
+        "profile. Output EXACTLY ONE LINE in this format:\n"
+        "\n"
+        "N/10 — <verdict in 8 words or fewer>\n"
+        "\n"
+        "Score anchors: 1-4 poor fit, 5-6 fair, 7-8 strong, 9-10 exceptional. "
+        "The verdict should name the dominant reason for the score (e.g. "
+        "stack match, comp gap, on-site only, level mismatch). No preamble, "
+        "no headings, no extra lines."
+    )
+    fields = [
+        f"PROFILE:\n{profile.strip()}",
+        "",
+        "JOB POSTING:",
+        f"Title: {job.title}",
+        f"Company: {job.company.name}",
+    ]
+    if job.location:
+        fields.append(f"Location: {job.location}")
+    fields.append("")
+    fields.append("Description:")
+    fields.append(job.description or "(no description available)")
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "\n".join(fields)},
+    ]
+
+
 def match_job(profile: str, job: Job) -> list[Message]:
     system = (
         "You are a precise career analyst writing directly to the user. "

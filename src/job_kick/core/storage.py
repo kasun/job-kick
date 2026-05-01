@@ -5,7 +5,7 @@ from types import TracebackType
 from tinydb import Query, TinyDB
 
 from job_kick.core.config import config_dir
-from job_kick.core.models import Job, SourceName
+from job_kick.core.models import Job, SearchTemplate, SourceName
 
 
 def data_path() -> Path:
@@ -61,12 +61,36 @@ class JobsTable:
         return len(removed)
 
 
+class TemplatesTable:
+    TABLE = "templates"
+
+    def __init__(self, db: TinyDB) -> None:
+        self._table = db.table(self.TABLE)
+
+    def upsert(self, template: SearchTemplate) -> None:
+        q = Query()
+        self._table.upsert(template.model_dump(mode="json"), q.name == template.name)
+
+    def get(self, name: str) -> SearchTemplate | None:
+        q = Query()
+        doc = self._table.get(q.name == name)
+        return SearchTemplate.model_validate(doc) if doc else None
+
+    def all(self) -> list[SearchTemplate]:
+        return [SearchTemplate.model_validate(d) for d in self._table.all()]
+
+    def delete(self, name: str) -> bool:
+        q = Query()
+        return bool(self._table.remove(q.name == name))
+
+
 class Storage:
     def __init__(self, path: Path | None = None) -> None:
         resolved = path or data_path()
         resolved.parent.mkdir(parents=True, exist_ok=True)
         self._db = TinyDB(resolved, indent=2, ensure_ascii=False)
         self.jobs = JobsTable(self._db)
+        self.templates = TemplatesTable(self._db)
 
     def close(self) -> None:
         self._db.close()

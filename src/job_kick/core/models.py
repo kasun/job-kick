@@ -28,6 +28,18 @@ class SearchQuery(BaseModel):
     posted_within: timedelta | None = None
 
 
+class SearchTemplate(BaseModel):
+    name: str
+    source: SourceName
+    keyword: str
+    location: str | None = None
+    limit: int | None = None
+    remote_only: bool | None = None
+    job_types: list[JobType] = Field(default_factory=list)
+    posted_within: timedelta | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 class Company(BaseModel):
     name: str
     url: HttpUrl | None = None
