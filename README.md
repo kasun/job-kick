@@ -1,8 +1,7 @@
 # job-kick
 
-[![PyPI](https://img.shields.io/pypi/v/job-kick.svg)](https://pypi.org/project/job-kick/)
-[![Python](https://img.shields.io/pypi/pyversions/job-kick.svg)](https://pypi.org/project/job-kick/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 > Terminal-first job-search assistant. Filter, save queries, and (optionally) rank with an LLM.
 
@@ -29,11 +28,23 @@ Bring an LLM key (Anthropic or OpenAI) if you want the extras: natural-language 
 
 ## Install
 
+`job-kick` isn't on PyPI yet. For now, install directly from the GitHub repo (Python 3.11+):
+
 ```bash
-pip install job-kick
-# or: uv tool install job-kick
+pip install git+https://github.com/kasun/job-kick.git
+# or with uv:
+uv tool install git+https://github.com/kasun/job-kick.git
 
 jobq configure
+```
+
+Or clone and install for local hacking:
+
+```bash
+git clone https://github.com/kasun/job-kick.git
+cd job-kick
+uv sync           # creates .venv and installs deps
+uv run jobq configure
 ```
 
 `jobq configure` walks through three steps: default source, LLM provider (Anthropic or OpenAI — bring your own API key), and search profile. The LLM features (`--prompt`, `--match`, `match`, `summarize`) need a key; everything else works without one.
