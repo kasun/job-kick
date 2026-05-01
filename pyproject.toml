@@ -33,8 +33,8 @@ dependencies = [
 jobq = "job_kick.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/appup-sh/job-kick"
-Issues = "https://github.com/appup-sh/job-kick/issues"
+Homepage = "https://github.com/kasun/job-kick"
+Issues = "https://github.com/kasun/job-kick/issues"
 
 [build-system]
 requires = ["hatchling"]
